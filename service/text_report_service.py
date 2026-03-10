@@ -14,7 +14,7 @@ import aiofiles
 
 
 class TextReportService:
-    '''
+    """
     Сервис для высокопроизводительной обработки текстовых отчетов.
 
     Использует пул процессов для выполнения ресурсоемких задач (CPU-bound),
@@ -22,12 +22,15 @@ class TextReportService:
 
     Attributes:
         process_pool (ProcessPoolExecutor): Пул процессов для параллельной обработки.
-    '''
+    """
+
     def __init__(self):
         self.process_pool = ProcessPoolExecutor(max_workers=os.cpu_count())
 
-    async def export_report(self, *, file: UploadFile, background_tasks: BackgroundTasks):
-        '''
+    async def export_report(
+        self, *, file: UploadFile, background_tasks: BackgroundTasks
+    ):
+        """
         Обрабатывает загруженный файл и конвертирует его в Excel.
 
         Метод выполняет следующие шаги:
@@ -47,38 +50,35 @@ class TextReportService:
         Raises:
             BadRequestException: Если имя файла отсутствует.
             InternalServerException: Если в процессе обработки возникло исключение.
-        '''
+        """
         if not file.filename:
-            raise BadRequestException(detail='The file was not transferred')
+            raise BadRequestException(detail="The file was not transferred")
 
-        fd_in, temp_input_path = tempfile.mkstemp(suffix='.txt')
-        fd_out, temp_output_path = tempfile.mkstemp(suffix='.xlsx')
+        fd_in, temp_input_path = tempfile.mkstemp(suffix=".txt")
+        fd_out, temp_output_path = tempfile.mkstemp(suffix=".xlsx")
 
         os.close(fd_in)
         os.close(fd_out)
 
         try:
-            async with aiofiles.open(temp_input_path, 'wb') as buffer:
+            async with aiofiles.open(temp_input_path, "wb") as buffer:
                 while chunk := await file.read(1024 * 1024 * 10):
                     await buffer.write(chunk)
-                
+
             loop = asyncio.get_running_loop()
 
             await loop.run_in_executor(
-                self.process_pool, 
-                process_file_task, 
-                temp_input_path, 
-                temp_output_path
+                self.process_pool, process_file_task, temp_input_path, temp_output_path
             )
 
             background_tasks.add_task(cleanup_files, temp_input_path, temp_output_path)
 
             return FileResponse(
                 path=temp_output_path,
-                filename=f'report_{file.filename}.xlsx',
-                media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                filename=f"report_{file.filename}.xlsx",
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
         except Exception as e:
             cleanup_files(temp_input_path, temp_output_path)
-            raise InternalServerException(detail=f'File processing error: {str(e)}')
+            raise InternalServerException(detail=f"File processing error: {str(e)}")

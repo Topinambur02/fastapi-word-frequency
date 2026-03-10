@@ -23,4 +23,3 @@ def test_internal_server_exception_inheritance():
     exc = InternalServerException()
 
     assert isinstance(exc, HTTPException)
-    
